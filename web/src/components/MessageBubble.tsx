@@ -21,7 +21,13 @@ function formatTime(ts: number): string {
   if (ts <= 0) return "";
   const d = new Date(ts);
   if (isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  const time = d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  const now = new Date();
+  const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  if (sameDay) return time;
+  const date = d.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
+  if (d.getFullYear() !== now.getFullYear()) return `${d.getFullYear()}/${date} ${time}`;
+  return `${date} ${time}`;
 }
 
 function QuestionRecord({ call }: { call: ToolCallInfo }) {
@@ -103,6 +109,9 @@ export default function MessageBubble({ message, isStreaming, toolGroupExpanded,
                 <span className="streaming-cursor" />
               )}
             </>
+          )}
+          {message.cancelled && (
+            <div className="message-cancelled">已取消</div>
           )}
         </div>
         <div className="message-time">{formatTime(message.timestamp)}</div>

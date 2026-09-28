@@ -758,6 +758,12 @@ summary:focus-visible {
   text-align: right;
 }
 
+.message-cancelled {
+  margin-top: 8px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
 .message.assistant .message-content p,
 .message.assistant .message-content ul,
 .message.assistant .message-content ol {

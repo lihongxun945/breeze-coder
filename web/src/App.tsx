@@ -252,7 +252,7 @@ export default function App() {
           turnId = run.turnId;
           updateSessionState(sourceSessionId, (state) => state.run?.turnId === run.turnId && state.run.revision > run.revision ? state : ({ ...state,
             run, streamingTurnId: run.turnId, backendBusy: run.state === "running",
-            summaryNotice: run.state === "interrupted" || run.state === "cancelled" ? { state: "failed", message: run.reason ?? "运行已中断" } : state.summaryNotice,
+            summaryNotice: run.state === "interrupted" ? { state: "failed", message: run.reason ?? "运行已中断" } : state.summaryNotice,
             awaitingApproval: run.state === "waiting_approval",
             awaitingInput: run.state === "waiting_user" && run.suspension?.status === "pending",
             streamingStatus: run.state === "interrupted" ? run.reason ?? "运行已中断" : run.status?.message ?? state.streamingStatus,
@@ -394,23 +394,56 @@ export default function App() {
           updateSessionState(sourceSessionId, (state) => ({ ...state, plan: null, planExecutionTurnId: undefined }));
           const plans = await fetchSessionPlans(sourceSessionId).catch(() => []);
           const plan = turnId ? plans.find((item) => item.turnId === turnId || item.relatedTurnIds?.includes(turnId!)) : undefined;
-          updateSessionState(sourceSessionId, (state) => ({
-            ...state,
-            messages: [...state.messages, {
-              role: "assistant",
-              text: `Error: ${(d.message as string) ?? "未知错误"}`,
-              toolCalls: [],
+          const errorMessage = (d.message as string) ?? "未知错误";
+          const isCancelled = currentRun?.state === "cancelled" || errorMessage === "会话已取消";
+          if (isCancelled) {
+            for (const toolCall of toolCalls) {
+              if (toolCall.result === undefined) {
+                toolCall.status = "interrupted";
+                toolCall.statusReason = "用户已取消";
+              }
+            }
+            const assistantMessage = {
+              role: "assistant" as const,
+              text: fullText,
+              toolCalls: [...toolCalls],
               timestamp: Date.now(),
               turnId,
               plan,
-            }],
-            streamingText: "",
-            streamingStatus: "",
-            streamingToolCalls: [],
-            streamingApprovalId: undefined,
-            backendBusy: false,
-            awaitingApproval: false,
-          }));
+              run: currentRun,
+              runState: currentRun?.state,
+              cancelled: true,
+            };
+            updateSessionState(sourceSessionId, (state) => ({
+              ...state,
+              messages: [...state.messages.filter((message) => !(turnId && message.role === "assistant" && message.turnId === turnId)), assistantMessage],
+              streamingText: "",
+              streamingStatus: "",
+              streamingToolCalls: [],
+              streamingApprovalId: undefined,
+              backendBusy: false,
+              awaitingApproval: false,
+              summaryNotice: undefined,
+            }));
+          } else {
+            updateSessionState(sourceSessionId, (state) => ({
+              ...state,
+              messages: [...state.messages, {
+                role: "assistant",
+                text: `Error: ${errorMessage}`,
+                toolCalls: [],
+                timestamp: Date.now(),
+                turnId,
+                plan,
+              }],
+              streamingText: "",
+              streamingStatus: "",
+              streamingToolCalls: [],
+              streamingApprovalId: undefined,
+              backendBusy: false,
+              awaitingApproval: false,
+            }));
+          }
           await refreshSessionPlan(sourceSessionId);
           break;
         }

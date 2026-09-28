@@ -27,6 +27,8 @@ export interface Message {
   plan?: SessionPlan;
   runState?: string;
   run?: RunView;
+  /** 本轮被用户取消：保留半程内容，气泡末尾渲染「已取消」尾注 */
+  cancelled?: boolean;
 }
 
 export interface Session {

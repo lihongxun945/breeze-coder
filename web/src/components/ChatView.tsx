@@ -1,4 +1,4 @@
-import { Fragment, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Message, ToolCallInfo, SessionPlan, RunView } from "../types.js";
 import { formatDuration, useElapsedTime } from "../lib/elapsed-time.js";
 import MessageBubble from "./MessageBubble.js";
@@ -71,6 +71,31 @@ export default function ChatView({
     : connectionLost ? "连接已断开，正在重连；任务状态待确认"
     : activity?.state === "started" ? activity.message
     : streamingStatus || (streamingText ? "正在生成回答..." : "正在处理");
+  const isCompressing = activity?.stage === "session_summary" && activity.state === "started"
+    && !!activity.message && /已用时 \d+ 秒/.test(activity.message);
+  const [, setCompressTick] = useState(0);
+  const compressAnchorRef = useRef<{ message: string; baseNow: number; baseSec: number } | undefined>(undefined);
+  useEffect(() => {
+    if (!isCompressing) {
+      compressAnchorRef.current = undefined;
+      return;
+    }
+    const timer = setInterval(() => setCompressTick((v) => v + 1), 1000);
+    return () => clearInterval(timer);
+  }, [isCompressing]);
+  const liveStatusText = (() => {
+    if (!isCompressing) return statusText;
+    const raw = activity!.message!;
+    const secMatch = raw.match(/已用时 (\d+) 秒/);
+    const baseSec = secMatch ? Number(secMatch[1]) : 0;
+    const anchor = compressAnchorRef.current;
+    if (!anchor || anchor.message !== raw) {
+      compressAnchorRef.current = { message: raw, baseNow: Date.now(), baseSec };
+    }
+    const a = compressAnchorRef.current!;
+    const liveSec = a.baseSec + Math.floor((Date.now() - a.baseNow) / 1000);
+    return raw.replace(/已用时 \d+ 秒/, `已用时 ${liveSec} 秒`);
+  })();
   const elapsed = useElapsedTime(activity?.startedAt, undefined, active && !connectionLost && !awaitingApproval);
   const textStreaming = active && !isStopping && !connectionLost && !awaitingApproval
     && (activity ? activity.stage === "execution:model_output" : !streamingStatus);
@@ -165,7 +190,7 @@ export default function ChatView({
         )}
         {(active || awaitingApproval) && (
           <div className="execution-status processing-indicator" role="status" aria-live="polite">
-            <span className="execution-status-text" title={statusText}>{statusText}</span>
+            <span className="execution-status-text" title={liveStatusText}>{liveStatusText}</span>
             {elapsed !== undefined && !isStopping && <span className="execution-status-time" aria-live="off">已耗时 {formatDuration(elapsed)}</span>}
           </div>
         )}
