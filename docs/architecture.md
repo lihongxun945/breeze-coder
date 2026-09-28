@@ -366,7 +366,7 @@ CLI 和 Gateway 入口会在加载插件前初始化 workspace 并调用 `ensure
 ```json
 {
   "subAgent": {
-    "allowedTools": ["web_search", "web_fetch", "file_read", "memory_list", "memory_read", "skill_list", "skill_use"],
+    "allowedTools": [],
     "disabledTools": ["bash", "file_write", "file_edit", "memory_save", "memory_append", "memory_delete", "sub_agent_run"],
     "maxIterations": 100,
     "maxConcurrency": 3
@@ -374,7 +374,7 @@ CLI 和 Gateway 入口会在加载插件前初始化 workspace 并调用 `ensure
 }
 ```
 
-- `allowedTools`：sub-agent 允许注册的工具白名单；未配置时使用默认只读工具集
+- `allowedTools`：sub-agent 允许注册的工具白名单；未配置或为空时使用执行器维护的默认只读工具集。非空白名单完全覆盖默认值，不自动扩充用户配置。
 - `disabledTools`：在白名单基础上额外禁用的工具
 - `maxIterations`：每个 sub-agent 的最大 Agent Loop 轮数，默认 100，硬上限为 100
 - `maxConcurrency`：一次 `sub_agent_run` 最多并发的 sub-agent 数，硬上限为 8
@@ -720,9 +720,13 @@ runSubAgents() 并发创建临时 AgentSession
 
 **权限模型：**
 
-Sub-agent 默认只允许 `web_search`、`web_fetch`、`file_read`、`memory_list`、`memory_read`、`skill_list`、`skill_use`。`bash`、`file_write`、`file_edit`、`memory_save`、`memory_append`、`memory_delete` 默认不可用。`sub_agent_run` 始终不可用，防止递归创建。
+Sub-agent 默认只允许 `web_search`、`web_fetch`、`file_read`、`project_tree`、`project_search`、`git_status`、`git_diff`、`memory_list`、`memory_search`、`memory_read`、`skill_list`、`skill_use`。四个项目工具仅在继承的项目会话上下文中可见，仍使用项目根目录边界校验及原有审批链路。`bash`、`file_write`、`file_edit`、`memory_save`、`memory_append`、`memory_delete` 默认不可用。`sub_agent_run` 始终不可用，防止递归创建。
+
+`core-sub-agent` 通过 `onBuildTurnPrompt` 在当前工具列表包含 `sub_agent_run` 时注入委派指引，因此自定义系统提示词同样生效，子 agent 和工具被过滤的请求则不注入。指引鼓励独立多方向调研、跨模块分析和代码审查按需并行，要求明确任务范围与上下文、避免重复调研，并由主 agent 核验整合结果；简单任务直接完成，不增加强制调度或调用次数要求。
 
 权限通过 `config.json` 的 `subAgent.allowedTools` 和 `subAgent.disabledTools` 配置。实现上，sub-agent 创建专用 `PluginManager`，并在工具注册阶段过滤工具定义，因此被禁用的工具不会进入模型可见工具列表。
+
+执行器等待子任务事件流完整结束后才销毁专用 `PluginManager`；不能在返回未完成的 Promise 时提前清理，否则运行中的工具注册与钩子会消失。
 
 **Prompt 模板：**
 

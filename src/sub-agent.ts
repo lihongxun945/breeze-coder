@@ -15,7 +15,12 @@ export const DEFAULT_SUB_AGENT_TOOLS = [
   "web_search",
   "web_fetch",
   "file_read",
+  "project_tree",
+  "project_search",
+  "git_status",
+  "git_diff",
   "memory_list",
+  "memory_search",
   "memory_read",
   "skill_list",
   "skill_use",
@@ -177,7 +182,8 @@ async function runOneSubAgent(
       maxAgentIterations: maxIterations,
     }, undefined, sessionContext);
 
-    return collectSubAgentResult({
+    // Keep the plugin host alive until the async event stream has finished.
+    return await collectSubAgentResult({
       workspacePath,
       actor,
       id,

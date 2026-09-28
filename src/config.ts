@@ -156,7 +156,7 @@ export function createDefaultConfig(): Record<string, unknown> {
     searxngUrl: "",
     braveApiKey: "",
     subAgent: {
-      allowedTools: ["web_search", "web_fetch", "file_read", "memory_list", "memory_search", "memory_read", "skill_list", "skill_use"],
+      allowedTools: [],
       disabledTools: ["bash", "file_write", "file_edit", "memory_save", "memory_append", "memory_delete", "memory_restore", "sub_agent_run"],
       maxIterations: 100,
       maxConcurrency: 3,
